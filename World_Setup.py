@@ -14,13 +14,34 @@ from PIL import _imaging
 import cv2
 import time
 import math
+from mpmath import cot, acot
 print("Entering the world creation module!")
 
 # Client creation
 client = carla.Client('localhost', 2000)
 
 
-towns=['Town01']
+towns=['Town07']
+
+def get_turning_angle(degree1,degree2):
+    if abs((float(degree1)+float(degree2))/2.0) <=0.1:
+        return(0)
+    print("degree1=", degree1)
+    print("degree2=", degree2)
+    # degree1=degree1*math.pi/180
+    # degree2=degree2*math.pi/180
+    degree=(((degree1)+(degree2))/2)
+    # print(degree)
+    return(degree)
+    
+def folder_classifier(degree):
+    classification_step=0.25
+    folder=int(degree/classification_step)
+    # print(folder)
+    return folder
+
+
+
 
 for town in towns:
     world = client.load_world(town)
@@ -121,12 +142,12 @@ for town in towns:
     vehicle.set_transform(waypoint.transform)
     
     
-    path="test_images"+town+"/"+str(image.frame)+".png"
-    image.save_to_disk(path)
-    path="test_images"+town+"/"+str(image.frame)+"_semseg.png"
-    image_seg.save_to_disk(path, carla.ColorConverter.CityScapesPalette)
-    path="test_images"+town+"/"+str(image.frame)+"_depth.png"
-    image.save_to_disk(path, carla.ColorConverter.LogarithmicDepth)
+    # path="test_images"+town+"/"+str(image.frame)+".png"
+    # image.save_to_disk(path)
+    # path="test_images"+town+"/"+str(image.frame)+"_semseg.png"
+    # image_seg.save_to_disk(path, carla.ColorConverter.CityScapesPalette)
+    # path="test_images"+town+"/"+str(image.frame)+"_depth.png"
+    # image.save_to_disk(path, carla.ColorConverter.LogarithmicDepth)
     
     
     # from detectron2.structures import BoxMode
@@ -167,11 +188,21 @@ for town in towns:
             # img_semseg = mpimg.imread("test_images/%06d_semseg.png" % image.frame)
             # #img_depth = mpimg.imread("test_images/%06d_depth.png" % image.frame)
             
-            path="test_images"+town+"/"+str(image.frame)+".png"
+            degree_turn=get_turning_angle(vehicle.get_wheel_steer_angle(carla.VehicleWheelLocation.FL_Wheel), vehicle.get_wheel_steer_angle(carla.VehicleWheelLocation.FR_Wheel))
+            folder=folder_classifier(degree_turn)
+            if folder==0:
+                pass
+            else:
+                folder=(folder*.25)+(np.sign(folder)*.125)
+            path="test_images/"+str(folder)+"/"+str(image.frame)+town+".png"
             image.save_to_disk(path)
-            path="test_images"+town+"/"+str(image.frame)+"_semseg.png"
-            image_seg.save_to_disk(path, carla.ColorConverter.CityScapesPalette)
-            path="test_images"+town+"/"+str(image.frame)+"_depth.png"
+            # i = np.array(image.raw_data)
+            # #np.save("iout.npy", i)
+            # cv2.imshow("",i)
+            # cv2.waitKey(1)
+            # path="test_images/"+str(folder)+"/"+str(image.frame)+"_semseg.png"
+            # image_seg.save_to_disk(path, carla.ColorConverter.CityScapesPalette)
+            path="test_images/"+str(folder)+"/"+str(image.frame)+town+"_depth.png"
             image.save_to_disk(path, carla.ColorConverter.LogarithmicDepth)
             
             
@@ -179,11 +210,14 @@ for town in towns:
             ## COCO format stuff, each image needs to have these keys
             
             image_value_pair[str(image.frame)+".png"]=[[vehicle.get_wheel_steer_angle(carla.VehicleWheelLocation.FL_Wheel),vehicle.get_wheel_steer_angle(carla.VehicleWheelLocation.FR_Wheel)],velocity]
-    
             
             
-            waypoint = random.choice(waypoint.next(1.5))
-            vehicle.set_transform(waypoint.transform)
+            if abs(degree_turn)<2:
+                vehicle.set_transform(waypoint.transform) 
+                
+            waypoint = random.choice(waypoint.next(1.5))    
+             
+            
     client.apply_batch([carla.command.DestroyActor(x) for x in actor_list])
     
     with open(town+'image_angle_vel.txt', 'w') as f:
